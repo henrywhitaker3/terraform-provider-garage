@@ -218,7 +218,8 @@ func mapKeyToData(data *AccessKeyResourceModel, key *client.AccessKey) {
 		data.Expiration = types.StringValue(*key.Expiration)
 	}
 	data.SecretAccessKey = types.StringNull()
-	if key.SecretAccessKey != nil {
+	if key.SecretAccessKey != nil && *key.SecretAccessKey != "" &&
+		data.SecretAccessKey.ValueString() == "" {
 		data.SecretAccessKey = types.StringValue(*key.SecretAccessKey)
 	}
 }
