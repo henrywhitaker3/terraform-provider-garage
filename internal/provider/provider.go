@@ -110,7 +110,9 @@ func (p *GarageProvider) Configure(
 }
 
 func (p *GarageProvider) Resources(ctx context.Context) []func() resource.Resource {
-	return []func() resource.Resource{}
+	return []func() resource.Resource{
+		NewBucketResource,
+	}
 }
 
 func (p *GarageProvider) EphemeralResources(
