@@ -10,6 +10,15 @@ import (
 type Bucket struct {
 	ID            string   `json:"id"`
 	GlobalAliases []string `json:"globalAliases"`
+	Keys          []struct {
+		AccessKeyID string `json:"accessKeyId"`
+		Name        string `json:"name"`
+		Permissions struct {
+			Owner bool `json:"owner"`
+			Read  bool `json:"read"`
+			Write bool `json:"write"`
+		} `json:"permissions"`
+	} `json:"keys"`
 }
 
 func (c *Client) GetBucket(ctx context.Context, id string) (*Bucket, error) {

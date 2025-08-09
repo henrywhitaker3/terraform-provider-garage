@@ -113,6 +113,7 @@ func (p *GarageProvider) Resources(ctx context.Context) []func() resource.Resour
 	return []func() resource.Resource{
 		NewBucketResource,
 		NewAccessKeyResource,
+		NewPermissionResource,
 	}
 }
 
