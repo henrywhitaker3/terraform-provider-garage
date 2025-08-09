@@ -1,12 +1,12 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
+// Package provider
 package provider
 
 import (
 	"context"
-	"net/http"
+	"fmt"
+	"slices"
 
+	garage "git.deuxfleurs.fr/garage-sdk/garage-admin-sdk-golang"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/function"
@@ -17,41 +17,68 @@ import (
 )
 
 // Ensure ScaffoldingProvider satisfies various provider interfaces.
-var _ provider.Provider = &ScaffoldingProvider{}
-var _ provider.ProviderWithFunctions = &ScaffoldingProvider{}
-var _ provider.ProviderWithEphemeralResources = &ScaffoldingProvider{}
+var _ provider.Provider = &GarageProvider{}
+var _ provider.ProviderWithFunctions = &GarageProvider{}
+var _ provider.ProviderWithEphemeralResources = &GarageProvider{}
 
-// ScaffoldingProvider defines the provider implementation.
-type ScaffoldingProvider struct {
+// GarageProvider defines the provider implementation.
+type GarageProvider struct {
 	// version is set to the provider version on release, "dev" when the
 	// provider is built and ran locally, and "test" when running acceptance
 	// testing.
 	version string
 }
 
-// ScaffoldingProviderModel describes the provider data model.
-type ScaffoldingProviderModel struct {
-	Endpoint types.String `tfsdk:"endpoint"`
+// GarageProviderModel describes the provider data model.
+type GarageProviderModel struct {
+	Host   types.String `tfsdk:"host"`
+	Scheme types.String `tfsdk:"scheme"`
+	Token  types.String `tfsdk:"token"`
 }
 
-func (p *ScaffoldingProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "scaffolding"
+func (p *GarageProvider) Metadata(
+	ctx context.Context,
+	req provider.MetadataRequest,
+	resp *provider.MetadataResponse,
+) {
+	resp.TypeName = "garage"
 	resp.Version = p.version
 }
 
-func (p *ScaffoldingProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
+func (p *GarageProvider) Schema(
+	ctx context.Context,
+	req provider.SchemaRequest,
+	resp *provider.SchemaResponse,
+) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"endpoint": schema.StringAttribute{
-				MarkdownDescription: "Example provider attribute",
+			"host": schema.StringAttribute{
+				MarkdownDescription: "Hostname/ip to access the garage api",
+				Required:            true,
+			},
+			"scheme": schema.StringAttribute{
+				MarkdownDescription: "The scheme to use, i.e.: http or https",
 				Optional:            true,
+			},
+			"token": schema.StringAttribute{
+				MarkdownDescription: "The token to authenticate with the garage api",
+				Required:            true,
 			},
 		},
 	}
 }
 
-func (p *ScaffoldingProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	var data ScaffoldingProviderModel
+type setupData struct {
+	client *garage.APIClient
+	ctx    context.Context
+}
+
+func (p *GarageProvider) Configure(
+	ctx context.Context,
+	req provider.ConfigureRequest,
+	resp *provider.ConfigureResponse,
+) {
+	var data GarageProviderModel
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
@@ -59,42 +86,53 @@ func (p *ScaffoldingProvider) Configure(ctx context.Context, req provider.Config
 		return
 	}
 
-	// Configuration values are now available.
-	// if data.Endpoint.IsNull() { /* ... */ }
+	scheme := data.Scheme.ValueString()
+	if scheme == "" {
+		scheme = "https"
+	}
 
-	// Example client configuration for data sources and resources
-	client := http.DefaultClient
-	resp.DataSourceData = client
-	resp.ResourceData = client
+	if !slices.Contains([]string{"http", "https"}, scheme) {
+		resp.Diagnostics.AddError(
+			"invalid scheme value",
+			fmt.Sprintf("scheme must be one of: http, https, got %s", scheme),
+		)
+		return
+	}
+
+	config := garage.NewConfiguration()
+	config.Scheme = scheme
+	config.Host = data.Host.ValueString()
+
+	setup := setupData{
+		client: garage.NewAPIClient(config),
+		ctx:    context.WithValue(ctx, garage.ContextAccessToken, data.Token.ValueString()),
+	}
+
+	resp.DataSourceData = setup
+	resp.ResourceData = setup
 }
 
-func (p *ScaffoldingProvider) Resources(ctx context.Context) []func() resource.Resource {
-	return []func() resource.Resource{
-		NewExampleResource,
-	}
+func (p *GarageProvider) Resources(ctx context.Context) []func() resource.Resource {
+	return []func() resource.Resource{}
 }
 
-func (p *ScaffoldingProvider) EphemeralResources(ctx context.Context) []func() ephemeral.EphemeralResource {
-	return []func() ephemeral.EphemeralResource{
-		NewExampleEphemeralResource,
-	}
+func (p *GarageProvider) EphemeralResources(
+	ctx context.Context,
+) []func() ephemeral.EphemeralResource {
+	return []func() ephemeral.EphemeralResource{}
 }
 
-func (p *ScaffoldingProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{
-		NewExampleDataSource,
-	}
+func (p *GarageProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
+	return []func() datasource.DataSource{}
 }
 
-func (p *ScaffoldingProvider) Functions(ctx context.Context) []func() function.Function {
-	return []func() function.Function{
-		NewExampleFunction,
-	}
+func (p *GarageProvider) Functions(ctx context.Context) []func() function.Function {
+	return []func() function.Function{}
 }
 
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {
-		return &ScaffoldingProvider{
+		return &GarageProvider{
 			version: version,
 		}
 	}

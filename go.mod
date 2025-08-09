@@ -1,8 +1,9 @@
-module github.com/hashicorp/terraform-provider-scaffolding-framework
+module github.com/henrywhitaker3/terraform-provider-grarage
 
 go 1.23.7
 
 require (
+	git.deuxfleurs.fr/garage-sdk/garage-admin-sdk-golang v0.0.0-20250711114140-962bbe8ca95f
 	github.com/hashicorp/terraform-plugin-framework v1.15.1
 	github.com/hashicorp/terraform-plugin-go v0.28.0
 	github.com/hashicorp/terraform-plugin-log v0.9.0
@@ -61,4 +62,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250218202821-56aae31c358a // indirect
 	google.golang.org/grpc v1.72.1 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
+	gopkg.in/validator.v2 v2.0.1 // indirect
 )
