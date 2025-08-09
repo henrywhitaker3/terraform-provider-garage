@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 )
 
-func TestAccBucketResource(t *testing.T) {
+func TestAccAccessKeyResource(t *testing.T) {
 	garage, cancel := garage(t)
 	defer cancel()
 
@@ -22,27 +22,36 @@ func TestAccBucketResource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: garage + testAccBucketResourceConfig(),
+				Config: garage + testAccAccessKeyResourceNeverExpiresConfig(),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
-						"garage_bucket.test",
+						"garage_access_key.test",
 						tfjsonpath.New("name"),
 						knownvalue.StringExact("bongo"),
+					),
+					statecheck.ExpectSensitiveValue(
+						"garage_access_key.test",
+						tfjsonpath.New("access_key_id"),
+					),
+					statecheck.ExpectSensitiveValue(
+						"garage_access_key.test",
+						tfjsonpath.New("secret_access_key"),
 					),
 				},
 			},
 			// ImportState testing
 			{
-				ResourceName:      "garage_bucket.test",
-				ImportState:       true,
-				ImportStateVerify: true,
+				ResourceName:            "garage_access_key.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"secret_access_key"},
 			},
 			// Update and Read testing
 			{
-				Config: garage + testAccBucketResourceConfig(),
+				Config: garage + testAccAccessKeyResourceNeverExpiresConfig(),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
-						"garage_bucket.test",
+						"garage_access_key.test",
 						tfjsonpath.New("name"),
 						knownvalue.StringExact("bongo"),
 					),
@@ -52,10 +61,11 @@ func TestAccBucketResource(t *testing.T) {
 	})
 }
 
-func testAccBucketResourceConfig() string {
+func testAccAccessKeyResourceNeverExpiresConfig() string {
 	return `
-resource "garage_bucket" "test" {
+resource "garage_access_key" "test" {
 	name = "bongo"
+	never_expires = true
 }
 `
 }

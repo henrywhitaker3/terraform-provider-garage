@@ -25,7 +25,6 @@ func NewBucketResource() resource.Resource {
 // BucketResource defines the resource implementation.
 type BucketResource struct {
 	client *client.Client
-	ctx    context.Context
 }
 
 // BucketResourceModel describes the resource data model.

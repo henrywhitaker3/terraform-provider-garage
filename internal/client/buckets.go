@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 )
 
 type Bucket struct {
@@ -13,37 +14,34 @@ type Bucket struct {
 
 func (c *Client) GetBucket(ctx context.Context, id string) (*Bucket, error) {
 	bucket := &Bucket{}
-	resp, err := c.do(ctx, http.MethodGet, "/v2/GetBucketInfo", nil, bucket)
+	_, err := c.do(
+		ctx,
+		http.MethodGet,
+		fmt.Sprintf("/v2/GetBucketInfo?id=%s", url.QueryEscape(id)),
+		nil,
+		bucket,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("get bucket: %w", err)
-	}
-	if resp.StatusCode > 299 {
-		return nil, fmt.Errorf("got status code %d", resp.StatusCode)
 	}
 	return bucket, nil
 }
 
 func (c *Client) CreateBucket(ctx context.Context, name string) (*Bucket, error) {
 	bucket := &Bucket{}
-	resp, err := c.do(ctx, http.MethodPost, "/v2/CreateBucket", map[string]any{
+	_, err := c.do(ctx, http.MethodPost, "/v2/CreateBucket", map[string]any{
 		"globalAlias": name,
 	}, bucket)
 	if err != nil {
 		return nil, fmt.Errorf("create bucket: %w", err)
 	}
-	if resp.StatusCode > 299 {
-		return nil, fmt.Errorf("got status code %d", resp.StatusCode)
-	}
 	return bucket, nil
 }
 
 func (c *Client) DeleteBucket(ctx context.Context, id string) error {
-	resp, err := c.do(ctx, http.MethodPost, fmt.Sprintf("/v2/DeleteBucket/%s", id), nil, nil)
+	_, err := c.do(ctx, http.MethodPost, fmt.Sprintf("/v2/DeleteBucket?id=%s", id), nil, nil)
 	if err != nil {
 		return fmt.Errorf("delete bucket: %w", err)
-	}
-	if resp.StatusCode > 299 {
-		return fmt.Errorf("got status code %d", resp.StatusCode)
 	}
 	return nil
 }

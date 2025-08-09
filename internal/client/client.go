@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 type Client struct {
@@ -45,6 +47,7 @@ func (c *Client) do(
 		reader,
 	)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -54,15 +57,18 @@ func (c *Client) do(
 		return nil, fmt.Errorf("do request: %w", err)
 	}
 
+	out, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return resp, fmt.Errorf("read response body: %w", err)
+	}
+	if string(out) != "" {
+		tflog.Debug(ctx, "got response body", map[string]any{"body": string(out)})
+	}
 	if resp.StatusCode > 299 {
-		return resp, nil
+		return resp, fmt.Errorf("got status code %d", resp.StatusCode)
 	}
 
-	if output != nil {
-		out, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return resp, fmt.Errorf("read response body: %w", err)
-		}
+	if len(out) != 0 && output != nil {
 		if err := json.Unmarshal(out, output); err != nil {
 			return resp, fmt.Errorf("unmarhsal body: %w", err)
 		}

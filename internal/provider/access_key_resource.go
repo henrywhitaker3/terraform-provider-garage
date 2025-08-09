@@ -23,11 +23,11 @@ func NewAccessKeyResource() resource.Resource {
 // AccessKeyResource defines the resource implementation.
 type AccessKeyResource struct {
 	client *client.Client
-	ctx    context.Context
 }
 
 // AccessKeyResourceModel describes the resource data model.
 type AccessKeyResourceModel struct {
+	ID              types.String `tfsdk:"id"`
 	Name            types.String `tfsdk:"name"`
 	AccessKeyID     types.String `tfsdk:"access_key_id"`
 	SecretAccessKey types.String `tfsdk:"secret_access_key"`
@@ -51,6 +51,11 @@ func (r *AccessKeyResource) Schema(
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Access key resource",
 		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				MarkdownDescription: "The id of the key",
+				Computed:            true,
+				Sensitive:           true,
+			},
 			"name": schema.StringAttribute{
 				MarkdownDescription: "The name of the access key",
 				Required:            true,
@@ -68,10 +73,12 @@ func (r *AccessKeyResource) Schema(
 			"expiration": schema.StringAttribute{
 				MarkdownDescription: "The time in RFC 3339 format that the key should expire",
 				Optional:            true,
+				Computed:            true,
 			},
 			"never_expires": schema.BoolAttribute{
 				MarkdownDescription: "Whether the key should expire or not",
 				Optional:            true,
+				Computed:            true,
 			},
 		},
 	}
@@ -123,35 +130,17 @@ func (r *AccessKeyResource) Create(
 		return
 	}
 
-	// body := garage.UpdateKeyRequestBody{
-	// 	Name:         *garage.NewNullableString(data.Name.ValueStringPointer()),
-	// 	NeverExpires: data.NeverExpires.ValueBoolPointer(),
-	// }
-	//
-	// if exp := data.Expiration.ValueString(); exp != "" {
-	// 	et, err := time.Parse(time.RFC3339, exp)
-	// 	if err != nil {
-	// 		resp.Diagnostics.AddError("invalid expiration value", err.Error())
-	// 		return
-	// 	}
-	// 	body.Expiration = *garage.NewNullableTime(&et)
-	// }
-	//
-	// key, _, err := r.client.AccessKeyAPI.CreateKey(r.ctx).
-	// 	Body(body).
-	// 	Execute()
-	// if err != nil {
-	// 	resp.Diagnostics.AddError("could not create access key", err.Error())
-	// 	return
-	// }
-	//
-	// data.Name = types.StringValue(key.Name)
-	// data.AccessKeyID = types.StringValue(key.AccessKeyId)
-	// data.Expiration = types.StringValue(key.Expiration.Get().String())
-	// data.NeverExpires = types.BoolValue(key.HasExpiration())
-	// if sec := key.SecretAccessKey.Get(); sec != nil {
-	// 	data.SecretAccessKey = types.StringValue(*sec)
-	// }
+	key, err := r.client.CreateAccessKey(ctx, client.CreateKeyRequest{
+		Name:         data.Name.ValueString(),
+		Expiration:   data.Expiration.ValueString(),
+		NeverExpires: data.NeverExpires.ValueBool(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("could not create key", err.Error())
+		return
+	}
+
+	mapKeyToData(&data, key)
 
 	tflog.Trace(ctx, "created a bucket")
 
@@ -172,16 +161,13 @@ func (r *AccessKeyResource) Read(
 		return
 	}
 
-	// bucket, _, err := r.client.BucketAPI.GetBucketInfo(r.ctx).Id(data.ID.ValueString()).Execute()
-	// if err != nil {
-	// 	resp.Diagnostics.AddError(
-	// 		"could not get bucket",
-	// 		fmt.Sprintf("got error from client: %s", err),
-	// 	)
-	// }
-	//
-	// data.ID = types.StringValue(bucket.Id)
-	// data.Name = types.StringValue(bucket.GlobalAliases[0])
+	key, err := r.client.GetAccessKey(ctx, data.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("could not get key", err.Error())
+		return
+	}
+
+	mapKeyToData(&data, key)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -201,20 +187,40 @@ func (r *AccessKeyResource) Update(
 		return
 	}
 
-	// bucket, _, err := r.client.BucketAPI.UpdateBucket(r.ctx, data.ID.ValueString()).
-	// 	UpdateBucketRequestBody(garage.UpdateBucketRequestBody{}).
-	// 	Execute()
-	//
-	// if err != nil {
-	// 	resp.Diagnostics.AddError("could not update bucket", err.Error())
-	// 	return
-	// }
-	//
-	// data.ID = types.StringValue(bucket.Id)
-	// data.Name = types.StringValue(bucket.GlobalAliases[0])
-	//
+	key, err := r.client.UpdateAccessKey(
+		ctx,
+		data.ID.ValueString(),
+		client.CreateKeyRequest{
+			Expiration:   data.Expiration.ValueString(),
+			NeverExpires: data.NeverExpires.ValueBool(),
+		},
+	)
+	if err != nil {
+		resp.Diagnostics.AddError("could not update key", err.Error())
+		return
+	}
+
+	mapKeyToData(&data, key)
+
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+func mapKeyToData(data *AccessKeyResourceModel, key *client.AccessKey) {
+	data.ID = types.StringValue(key.AccessKeyID)
+	data.Name = types.StringValue(key.Name)
+	data.AccessKeyID = types.StringValue(key.AccessKeyID)
+	data.Expiration = types.StringNull()
+	if key.Expiration == nil {
+		data.NeverExpires = types.BoolValue(true)
+	} else {
+
+		data.Expiration = types.StringValue(*key.Expiration)
+	}
+	data.SecretAccessKey = types.StringNull()
+	if key.SecretAccessKey != nil {
+		data.SecretAccessKey = types.StringValue(*key.SecretAccessKey)
+	}
 }
 
 func (r *AccessKeyResource) Delete(
@@ -231,19 +237,10 @@ func (r *AccessKeyResource) Delete(
 		return
 	}
 
-	// response, err := r.client.BucketAPI.DeleteBucket(r.ctx, data.ID.ValueString()).Execute()
-	// if err != nil {
-	// 	resp.Diagnostics.AddError("could not delete bucket", err.Error())
-	// 	return
-	// }
-	// if response.StatusCode > 299 {
-	// 	body, _ := io.ReadAll(response.Body)
-	// 	resp.Diagnostics.AddError(
-	// 		"could not delete bucket",
-	// 		fmt.Sprintf("got status code %d: %s", response.StatusCode, string(body)),
-	// 	)
-	// 	return
-	// }
+	if err := r.client.DeleteAccessKey(ctx, data.ID.ValueString()); err != nil {
+		resp.Diagnostics.AddError("could not delete key", err.Error())
+		return
+	}
 }
 
 func (r *AccessKeyResource) ImportState(
