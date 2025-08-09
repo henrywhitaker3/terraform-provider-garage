@@ -1,4 +1,4 @@
-module github.com/henrywhitaker3/terraform-provider-grarage
+module github.com/henrywhitaker3/terraform-provider-garage
 
 go 1.24.5
 

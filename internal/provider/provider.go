@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/henrywhitaker3/terraform-provider-grarage/internal/client"
+	"github.com/henrywhitaker3/terraform-provider-garage/internal/client"
 )
 
 // Ensure ScaffoldingProvider satisfies various provider interfaces.
