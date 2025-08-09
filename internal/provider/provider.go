@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"slices"
 
-	garage "git.deuxfleurs.fr/garage-sdk/garage-admin-sdk-golang"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/function"
@@ -14,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/henrywhitaker3/terraform-provider-grarage/internal/client"
 )
 
 // Ensure ScaffoldingProvider satisfies various provider interfaces.
@@ -69,8 +69,7 @@ func (p *GarageProvider) Schema(
 }
 
 type setupData struct {
-	client *garage.APIClient
-	ctx    context.Context
+	client *client.Client
 }
 
 func (p *GarageProvider) Configure(
@@ -99,13 +98,11 @@ func (p *GarageProvider) Configure(
 		return
 	}
 
-	config := garage.NewConfiguration()
-	config.Scheme = scheme
-	config.Host = data.Host.ValueString()
-
 	setup := setupData{
-		client: garage.NewAPIClient(config),
-		ctx:    context.WithValue(ctx, garage.ContextAccessToken, data.Token.ValueString()),
+		client: client.New(
+			fmt.Sprintf("%s://%s", scheme, data.Host.ValueString()),
+			data.Token.ValueString(),
+		),
 	}
 
 	resp.DataSourceData = setup

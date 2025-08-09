@@ -3,15 +3,13 @@ package provider
 import (
 	"context"
 	"fmt"
-	"io"
-	"time"
 
-	garage "git.deuxfleurs.fr/garage-sdk/garage-admin-sdk-golang"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/henrywhitaker3/terraform-provider-grarage/internal/client"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -24,7 +22,7 @@ func NewAccessKeyResource() resource.Resource {
 
 // AccessKeyResource defines the resource implementation.
 type AccessKeyResource struct {
-	client *garage.APIClient
+	client *client.Client
 	ctx    context.Context
 }
 
@@ -102,7 +100,6 @@ func (r *AccessKeyResource) Configure(
 	}
 
 	r.client = setup.client
-	r.ctx = setup.ctx
 }
 
 func (r *AccessKeyResource) Create(
@@ -126,35 +123,35 @@ func (r *AccessKeyResource) Create(
 		return
 	}
 
-	body := garage.UpdateKeyRequestBody{
-		Name:         *garage.NewNullableString(data.Name.ValueStringPointer()),
-		NeverExpires: data.NeverExpires.ValueBoolPointer(),
-	}
-
-	if exp := data.Expiration.ValueString(); exp != "" {
-		et, err := time.Parse(time.RFC3339, exp)
-		if err != nil {
-			resp.Diagnostics.AddError("invalid expiration value", err.Error())
-			return
-		}
-		body.Expiration = *garage.NewNullableTime(&et)
-	}
-
-	key, _, err := r.client.AccessKeyAPI.CreateKey(r.ctx).
-		Body(body).
-		Execute()
-	if err != nil {
-		resp.Diagnostics.AddError("could not create access key", err.Error())
-		return
-	}
-
-	data.Name = types.StringValue(key.Name)
-	data.AccessKeyID = types.StringValue(key.AccessKeyId)
-	data.Expiration = types.StringValue(key.Expiration.Get().String())
-	data.NeverExpires = types.BoolValue(!key.HasExpiration())
-	if sec := key.SecretAccessKey.Get(); sec != nil {
-		data.SecretAccessKey = types.StringValue(*sec)
-	}
+	// body := garage.UpdateKeyRequestBody{
+	// 	Name:         *garage.NewNullableString(data.Name.ValueStringPointer()),
+	// 	NeverExpires: data.NeverExpires.ValueBoolPointer(),
+	// }
+	//
+	// if exp := data.Expiration.ValueString(); exp != "" {
+	// 	et, err := time.Parse(time.RFC3339, exp)
+	// 	if err != nil {
+	// 		resp.Diagnostics.AddError("invalid expiration value", err.Error())
+	// 		return
+	// 	}
+	// 	body.Expiration = *garage.NewNullableTime(&et)
+	// }
+	//
+	// key, _, err := r.client.AccessKeyAPI.CreateKey(r.ctx).
+	// 	Body(body).
+	// 	Execute()
+	// if err != nil {
+	// 	resp.Diagnostics.AddError("could not create access key", err.Error())
+	// 	return
+	// }
+	//
+	// data.Name = types.StringValue(key.Name)
+	// data.AccessKeyID = types.StringValue(key.AccessKeyId)
+	// data.Expiration = types.StringValue(key.Expiration.Get().String())
+	// data.NeverExpires = types.BoolValue(key.HasExpiration())
+	// if sec := key.SecretAccessKey.Get(); sec != nil {
+	// 	data.SecretAccessKey = types.StringValue(*sec)
+	// }
 
 	tflog.Trace(ctx, "created a bucket")
 
@@ -175,16 +172,16 @@ func (r *AccessKeyResource) Read(
 		return
 	}
 
-	bucket, _, err := r.client.BucketAPI.GetBucketInfo(r.ctx).Id(data.ID.ValueString()).Execute()
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"could not get bucket",
-			fmt.Sprintf("got error from client: %s", err),
-		)
-	}
-
-	data.ID = types.StringValue(bucket.Id)
-	data.Name = types.StringValue(bucket.GlobalAliases[0])
+	// bucket, _, err := r.client.BucketAPI.GetBucketInfo(r.ctx).Id(data.ID.ValueString()).Execute()
+	// if err != nil {
+	// 	resp.Diagnostics.AddError(
+	// 		"could not get bucket",
+	// 		fmt.Sprintf("got error from client: %s", err),
+	// 	)
+	// }
+	//
+	// data.ID = types.StringValue(bucket.Id)
+	// data.Name = types.StringValue(bucket.GlobalAliases[0])
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -204,18 +201,18 @@ func (r *AccessKeyResource) Update(
 		return
 	}
 
-	bucket, _, err := r.client.BucketAPI.UpdateBucket(r.ctx, data.ID.ValueString()).
-		UpdateBucketRequestBody(garage.UpdateBucketRequestBody{}).
-		Execute()
-
-	if err != nil {
-		resp.Diagnostics.AddError("could not update bucket", err.Error())
-		return
-	}
-
-	data.ID = types.StringValue(bucket.Id)
-	data.Name = types.StringValue(bucket.GlobalAliases[0])
-
+	// bucket, _, err := r.client.BucketAPI.UpdateBucket(r.ctx, data.ID.ValueString()).
+	// 	UpdateBucketRequestBody(garage.UpdateBucketRequestBody{}).
+	// 	Execute()
+	//
+	// if err != nil {
+	// 	resp.Diagnostics.AddError("could not update bucket", err.Error())
+	// 	return
+	// }
+	//
+	// data.ID = types.StringValue(bucket.Id)
+	// data.Name = types.StringValue(bucket.GlobalAliases[0])
+	//
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -234,19 +231,19 @@ func (r *AccessKeyResource) Delete(
 		return
 	}
 
-	response, err := r.client.BucketAPI.DeleteBucket(r.ctx, data.ID.ValueString()).Execute()
-	if err != nil {
-		resp.Diagnostics.AddError("could not delete bucket", err.Error())
-		return
-	}
-	if response.StatusCode > 299 {
-		body, _ := io.ReadAll(response.Body)
-		resp.Diagnostics.AddError(
-			"could not delete bucket",
-			fmt.Sprintf("got status code %d: %s", response.StatusCode, string(body)),
-		)
-		return
-	}
+	// response, err := r.client.BucketAPI.DeleteBucket(r.ctx, data.ID.ValueString()).Execute()
+	// if err != nil {
+	// 	resp.Diagnostics.AddError("could not delete bucket", err.Error())
+	// 	return
+	// }
+	// if response.StatusCode > 299 {
+	// 	body, _ := io.ReadAll(response.Body)
+	// 	resp.Diagnostics.AddError(
+	// 		"could not delete bucket",
+	// 		fmt.Sprintf("got status code %d: %s", response.StatusCode, string(body)),
+	// 	)
+	// 	return
+	// }
 }
 
 func (r *AccessKeyResource) ImportState(

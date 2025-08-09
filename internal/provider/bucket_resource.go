@@ -3,9 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
-	"io"
 
-	garage "git.deuxfleurs.fr/garage-sdk/garage-admin-sdk-golang"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -13,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/henrywhitaker3/terraform-provider-grarage/internal/client"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -25,7 +24,7 @@ func NewBucketResource() resource.Resource {
 
 // BucketResource defines the resource implementation.
 type BucketResource struct {
-	client *garage.APIClient
+	client *client.Client
 	ctx    context.Context
 }
 
@@ -89,7 +88,6 @@ func (r *BucketResource) Configure(
 	}
 
 	r.client = setup.client
-	r.ctx = setup.ctx
 }
 
 func (r *BucketResource) Create(
@@ -105,18 +103,13 @@ func (r *BucketResource) Create(
 		return
 	}
 
-	bucket, _, err := r.client.BucketAPI.CreateBucket(r.ctx).
-		CreateBucketRequest(garage.CreateBucketRequest{
-			GlobalAlias: *garage.NewNullableString(data.Name.ValueStringPointer()),
-		}).
-		Execute()
-
+	bucket, err := r.client.CreateBucket(ctx, data.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("failed to create bucket", fmt.Sprintf("got error: %s", err))
 		return
 	}
 
-	data.ID = types.StringValue(bucket.Id)
+	data.ID = types.StringValue(bucket.ID)
 	data.Name = types.StringValue(bucket.GlobalAliases[0])
 
 	tflog.Trace(ctx, "created a bucket")
@@ -138,15 +131,16 @@ func (r *BucketResource) Read(
 		return
 	}
 
-	bucket, _, err := r.client.BucketAPI.GetBucketInfo(r.ctx).Id(data.ID.ValueString()).Execute()
+	bucket, err := r.client.GetBucket(ctx, data.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"could not get bucket",
 			fmt.Sprintf("got error from client: %s", err),
 		)
+		return
 	}
 
-	data.ID = types.StringValue(bucket.Id)
+	data.ID = types.StringValue(bucket.ID)
 	data.Name = types.StringValue(bucket.GlobalAliases[0])
 
 	// Save updated data into Terraform state
@@ -167,18 +161,6 @@ func (r *BucketResource) Update(
 		return
 	}
 
-	bucket, _, err := r.client.BucketAPI.UpdateBucket(r.ctx, data.ID.ValueString()).
-		UpdateBucketRequestBody(garage.UpdateBucketRequestBody{}).
-		Execute()
-
-	if err != nil {
-		resp.Diagnostics.AddError("could not update bucket", err.Error())
-		return
-	}
-
-	data.ID = types.StringValue(bucket.Id)
-	data.Name = types.StringValue(bucket.GlobalAliases[0])
-
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -197,17 +179,8 @@ func (r *BucketResource) Delete(
 		return
 	}
 
-	response, err := r.client.BucketAPI.DeleteBucket(r.ctx, data.ID.ValueString()).Execute()
-	if err != nil {
+	if err := r.client.DeleteBucket(ctx, data.ID.ValueString()); err != nil {
 		resp.Diagnostics.AddError("could not delete bucket", err.Error())
-		return
-	}
-	if response.StatusCode > 299 {
-		body, _ := io.ReadAll(response.Body)
-		resp.Diagnostics.AddError(
-			"could not delete bucket",
-			fmt.Sprintf("got status code %d: %s", response.StatusCode, string(body)),
-		)
 		return
 	}
 }

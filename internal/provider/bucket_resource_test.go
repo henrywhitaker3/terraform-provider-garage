@@ -62,6 +62,7 @@ func TestAccBucketResource(t *testing.T) {
 func testAccBucketResourceConfig() string {
 	return `
 resource "garage_bucket" "test" {
+	name = "bongo"
 }
 `
 }
