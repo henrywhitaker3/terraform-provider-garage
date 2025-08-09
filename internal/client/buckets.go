@@ -23,7 +23,7 @@ type Bucket struct {
 
 func (c *Client) GetBucket(ctx context.Context, id string) (*Bucket, error) {
 	bucket := &Bucket{}
-	_, err := c.do(
+	err := c.do(
 		ctx,
 		http.MethodGet,
 		fmt.Sprintf("/v2/GetBucketInfo?id=%s", url.QueryEscape(id)),
@@ -38,7 +38,7 @@ func (c *Client) GetBucket(ctx context.Context, id string) (*Bucket, error) {
 
 func (c *Client) CreateBucket(ctx context.Context, name string) (*Bucket, error) {
 	bucket := &Bucket{}
-	_, err := c.do(ctx, http.MethodPost, "/v2/CreateBucket", map[string]any{
+	err := c.do(ctx, http.MethodPost, "/v2/CreateBucket", map[string]any{
 		"globalAlias": name,
 	}, bucket)
 	if err != nil {
@@ -48,7 +48,7 @@ func (c *Client) CreateBucket(ctx context.Context, name string) (*Bucket, error)
 }
 
 func (c *Client) DeleteBucket(ctx context.Context, id string) error {
-	_, err := c.do(ctx, http.MethodPost, fmt.Sprintf("/v2/DeleteBucket?id=%s", id), nil, nil)
+	err := c.do(ctx, http.MethodPost, fmt.Sprintf("/v2/DeleteBucket?id=%s", id), nil, nil)
 	if err != nil {
 		return fmt.Errorf("delete bucket: %w", err)
 	}

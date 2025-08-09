@@ -55,7 +55,7 @@ func (c *Client) CreatePermission(
 	ctx context.Context,
 	req CreatePermissionRequest,
 ) (*Permission, error) {
-	_, err := c.do(ctx, http.MethodPost, "/v2/AllowBucketKey", req, nil)
+	err := c.do(ctx, http.MethodPost, "/v2/AllowBucketKey", req, nil)
 	if err != nil {
 		return nil, fmt.Errorf("grant bucket permissions: %w", err)
 	}
@@ -80,7 +80,7 @@ func (c *Client) UpdatePermission(
 		},
 	}
 
-	_, err := c.do(ctx, http.MethodPost, "/v2/DenyBucketKey", inverse, nil)
+	err := c.do(ctx, http.MethodPost, "/v2/DenyBucketKey", inverse, nil)
 	if err != nil {
 		return nil, fmt.Errorf("remove bucket permissions: %w", err)
 	}

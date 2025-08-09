@@ -16,7 +16,7 @@ type AccessKey struct {
 
 func (c *Client) GetAccessKey(ctx context.Context, id string) (*AccessKey, error) {
 	key := &AccessKey{}
-	_, err := c.do(
+	err := c.do(
 		ctx,
 		http.MethodGet,
 		fmt.Sprintf("/v2/GetKeyInfo?id=%s", url.QueryEscape(id)),
@@ -37,7 +37,7 @@ type CreateKeyRequest struct {
 
 func (c *Client) CreateAccessKey(ctx context.Context, req CreateKeyRequest) (*AccessKey, error) {
 	key := &AccessKey{}
-	_, err := c.do(ctx, http.MethodPost, "/v2/CreateKey", req, key)
+	err := c.do(ctx, http.MethodPost, "/v2/CreateKey", req, key)
 	if err != nil {
 		return nil, fmt.Errorf("create key: %w", err)
 	}
@@ -50,7 +50,7 @@ func (c *Client) UpdateAccessKey(
 	req CreateKeyRequest,
 ) (*AccessKey, error) {
 	key := &AccessKey{}
-	_, err := c.do(
+	err := c.do(
 		ctx,
 		http.MethodPost,
 		fmt.Sprintf("/v2/UpdateKey?id=%s", url.QueryEscape(id)),
@@ -64,7 +64,7 @@ func (c *Client) UpdateAccessKey(
 }
 
 func (c *Client) DeleteAccessKey(ctx context.Context, id string) error {
-	_, err := c.do(
+	err := c.do(
 		ctx,
 		http.MethodPost,
 		fmt.Sprintf("/v2/DeleteKey?id=%s", url.QueryEscape(id)),
